@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"ex_x_centro_custo\\\\|idTurma\\\\|PREFIXO\" /c/Users/BrunoSupriano/Desktop/EnviarGraficoWhatsapp --include=*.js --include=*.sql)",
+      "Bash(find /c/Users/BrunoSupriano/Desktop/EnviarGraficoWhatsapp -type f -name *.js -o -name *.md -o -name *.txt -o -name *.sql)"
+    ]
+  }
+}

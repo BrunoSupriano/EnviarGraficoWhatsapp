@@ -5,7 +5,12 @@
       "Bash(npm init:*)",
       "Bash(npm install:*)",
       "Bash(python3 -c \":*)",
-      "Bash(node -e \"const pkg = require\\(''./node_modules/whatsapp-web.js/package.json''\\); console.log\\(pkg.version\\)\")"
+      "Bash(node -e \"const pkg = require\\(''./node_modules/whatsapp-web.js/package.json''\\); console.log\\(pkg.version\\)\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\BrunoSupriano\\\\Desktop\\\\EnviarGraficoWhatsapp\\\\frontend\\\\templates\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\BrunoSupriano\\\\Desktop\\\\EnviarGraficoWhatsapp\\\\output\")",
+      "Bash(node test-dashboard.js)",
+      "Bash(node tasks/gerar_dashboard.js)",
+      "Bash(node -e \":*)"
     ]
   }
 }

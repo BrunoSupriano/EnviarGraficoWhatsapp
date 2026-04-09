@@ -1,11 +1,41 @@
-# WhatsApp Auto Image Sender
+# WhatsApp Dashboard Bot
 
-Envia uma imagem automaticamente para um grupo do WhatsApp usando [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js).
+Automatiza a geração de dashboards a partir de dados do PostgreSQL e o envio para grupos do WhatsApp. O projeto é estruturado em tasks independentes, pensado para migração futura ao Apache Airflow.
 
-## Requisitos
+---
 
-- [Node.js](https://nodejs.org/) v18+
-- Google Chrome instalado em `C:/Program Files/Google/Chrome/Application/chrome.exe`
+## Estrutura do Projeto
+
+```
+├── tasks/
+│   ├── gerar_dashboard.js   # Task 1 — busca dados no banco e gera o PNG
+│   └── enviar_whatsapp.js   # Task 2 — envia o PNG para o grupo
+│
+├── backend/
+│   ├── main.js              # Orquestrador local (roda as tasks em sequência)
+│   ├── database.js          # Conexão e queries PostgreSQL
+│   └── whatsapp.js          # Cliente WhatsApp (autenticação + envio)
+│
+├── frontend/
+│   ├── dashboard.js         # Gerador de imagem via Puppeteer
+│   └── templates/
+│       └── dashboard.html   # Template visual (Chart.js, tema escuro)
+│
+├── output/
+│   └── dashboard.png        # Imagem gerada pela Task 1, consumida pela Task 2
+│
+└── test-dashboard.js        # Teste isolado do dashboard (sem WhatsApp)
+```
+
+---
+
+## Pré-requisitos
+
+- Node.js 18+
+- Google Chrome instalado (ou o Chrome bundled do Puppeteer, baixado automaticamente)
+- PostgreSQL acessível com a view `celesc_2.despachoweb_gold`
+
+---
 
 ## Instalação
 
@@ -13,55 +43,100 @@ Envia uma imagem automaticamente para um grupo do WhatsApp usando [whatsapp-web.
 npm install
 ```
 
+---
+
 ## Configuração
 
-1. Coloque a imagem que deseja enviar na pasta do projeto com o nome `imagem.jpg`
+Crie o arquivo `.env` na raiz com as credenciais:
 
-2. Edite as variáveis no `index.js`:
+```env
+PG_USER=seu_usuario
+PG_HOST=seu_host
+PG_PORT=5433
+PG_PASSWORD=sua_senha
+PG_DBNAME=seu_db
 
-```js
-const NOME_GRUPO = 'Nome do seu grupo'; // parte do nome já funciona
-const CAMINHO_IMAGEM = path.join(__dirname, 'imagem.jpg');
-const LEGENDA = 'Sua legenda aqui';
+WHATSAPP_GROUP=Nome do Grupo
+WHATSAPP_CAPTION=📈 Relatório UCM — Atualizado automaticamente
 ```
 
-## Como rodar
+> `WHATSAPP_GROUP` deve conter parte do nome do grupo (busca por correspondência parcial).
+
+---
+
+## Como Rodar
+
+### Testar só o dashboard (sem WhatsApp)
+
+Útil para validar o visual e a conexão com o banco antes de envolver o WhatsApp.
 
 ```bash
-node index.js
+node test-dashboard.js
 ```
 
-### Primeira execução
+Gera o arquivo `output/dashboard.png`. Abra para conferir o resultado.
 
-Na primeira vez, um QR Code será exibido no terminal:
+---
 
-1. Abra o WhatsApp no celular
-2. Vá em **Dispositivos conectados > Conectar dispositivo**
-3. Escaneie o QR Code
+### Rodar as tasks individualmente
 
-A sessão fica salva na pasta `.wwebjs_auth/` — nas próximas execuções não precisa escanear novamente.
-
-### O que o script faz
-
-1. Conecta ao WhatsApp Web via Chrome
-2. Lista todos os grupos disponíveis no terminal
-3. Encontra o grupo pelo nome configurado
-4. Envia uma mensagem de texto de teste
-5. Envia a imagem com legenda
-6. Aguarda 10 segundos para garantir o upload e encerra
-
-## Estrutura do projeto
-
+**Task 1 — Gerar o dashboard:**
+```bash
+node tasks/gerar_dashboard.js
 ```
-TesteWpp/
-├── index.js        # script principal
-├── imagem.jpg      # imagem a ser enviada
-├── package.json
-└── .gitignore
+Saída: `output/dashboard.png`
+
+**Task 2 — Enviar via WhatsApp:**
+```bash
+node tasks/enviar_whatsapp.js
+```
+Entrada: `output/dashboard.png` (precisa existir)
+
+Na primeira execução, o WhatsApp exibirá um QR Code no terminal — escaneie com o app para autenticar. A sessão fica salva em `backend/session/` para execuções futuras.
+
+---
+
+### Rodar o pipeline completo (local)
+
+Executa as duas tasks em sequência. Se a Task 1 falhar, a Task 2 não é iniciada.
+
+```bash
+node backend/main.js
 ```
 
-## Observações
+---
 
-- A pasta `node_modules/` e `.wwebjs_auth/` são ignoradas pelo git
-- O `.wwebjs_auth/` contém sua sessão autenticada — não compartilhe
-- Esta biblioteca é não oficial e viola os Termos de Serviço do WhatsApp; use com moderação
+## Migração para Airflow
+
+Cada task é um script Node.js independente com `exit code 0` (sucesso) ou `1` (falha), pronto para uso como `BashOperator`:
+
+```python
+from airflow.operators.bash import BashOperator
+
+gerar_dashboard = BashOperator(
+    task_id='gerar_dashboard',
+    bash_command='node /caminho/tasks/gerar_dashboard.js',
+)
+
+enviar_whatsapp = BashOperator(
+    task_id='enviar_whatsapp',
+    bash_command='node /caminho/tasks/enviar_whatsapp.js',
+)
+
+gerar_dashboard >> enviar_whatsapp
+```
+
+O arquivo `output/dashboard.png` é o contrato entre as duas tasks — equivalente a um XCom baseado em filesystem.
+
+---
+
+## Tecnologias
+
+| Tecnologia | Uso |
+|---|---|
+| Node.js | Runtime |
+| whatsapp-web.js | Integração com WhatsApp |
+| Puppeteer | Renderização do dashboard em PNG |
+| Chart.js | Gráficos no template HTML |
+| PostgreSQL (pg) | Fonte de dados |
+| dotenv | Gerenciamento de credenciais |

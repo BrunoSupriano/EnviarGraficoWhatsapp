@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Paleta da empresa ───────────────────────────────────────────────
+       #008c6a  verde principal
+       #006d58  verde escuro
+       #5bb98e  verde claro
+       #4a4a49  cinza
+    ── */
+
+    /* ── Página fixa 1920 × 1080 ─────────────────────────────────────── */
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #151918;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER (70px) ───────────────────────────────────────────────── */
+    .header {
+      flex-shrink: 0;
+      height: 70px;
+      background: #151918;
+      border-bottom: 1px solid #2e3d39;
+      padding: 0 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .header-logo {
+      width: 50px; height: 50px;
+      border-radius: 50%;
+      object-fit: contain;
+    }
+    .header-title    { font-size: 22px; font-weight: 700; color: #fff; }
+    .header-subtitle { font-size: 12px; color: rgba(255,255,255,0.65); margin-top: 2px; }
+    .header-date     { font-size: 13px; color: #e2e8f0; text-align: right; line-height: 1.6; }
+    .header-date strong { color: #5bb98e; }
+
+    /* ── KPI GRID (120px) ────────────────────────────────────────────── */
+    .kpi-grid {
+      flex-shrink: 0;
+      height: 120px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      padding: 14px 36px;
+      background: #1a1f1e;
+    }
+    .kpi-card {
+      background: #202824;
+      border: 1px solid #2e3d39;
+      border-top: 3px solid #008c6a;
+      border-radius: 9px;
+      padding: 10px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .kpi-label { font-size: 11px; color: #7a9e96; text-transform: uppercase; letter-spacing: .5px; }
+    .kpi-value { font-size: 24px; font-weight: 700; color: #fff; margin-top: 3px; line-height: 1.1; }
+    .kpi-value.primary   { color: #5bb98e; }
+    .kpi-value.secondary { color: #008c6a; }
+    .kpi-value.muted     { color: #a3c4bc; }
+    .kpi-sub { font-size: 11px; color: #4a6b63; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kpi-delta {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin-top: 5px;
+      font-size: 12px; font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+    .kpi-delta.up   { background: #008c6a22; color: #5bb98e; }
+    .kpi-delta.down { background: #c0392b22; color: #e74c3c; }
+    .kpi-delta.flat { background: #4a4a4922; color: #7a9e96; }
+
+    /* ── ÁREA PRINCIPAL (dois painéis lado a lado) ───────────────────── */
+    .main-content {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      padding: 14px 36px;
+    }
+
+    /* Painel esquerdo: dois gráficos empilhados */
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
+    }
+    .left-top    { flex: 0 0 52%; min-height: 0; }
+    .left-bottom { flex: 1;       min-height: 0; }
+
+    /* Painel direito: gráfico de barras (60%) + tabela (40%) */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
+    }
+    .right-chart { flex: 0 0 55%; min-height: 0; }
+    .right-table { flex: 1; min-height: 0; overflow: hidden; }
+
+    /* ── CARD de gráfico ─────────────────────────────────────────────── */
+    .chart-wrapper {
+      background: #202824;
+      border: 1px solid #2e3d39;
+      border-radius: 9px;
+      padding: 14px 16px 12px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .chart-title {
+      flex-shrink: 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: #c8ddd9;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .chart-title::before {
+      content: '';
+      display: inline-block;
+      width: 3px; height: 14px;
+      background: #008c6a;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .chart-delta-badge {
+      font-size: 12px; font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .chart-delta-badge.up   { background: #008c6a22; color: #5bb98e; }
+    .chart-delta-badge.down { background: #c0392b22; color: #e74c3c; }
+    .chart-delta-badge.flat { background: #4a4a4922; color: #7a9e96; }
+    .chart-canvas-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+    canvas { display: block; }
+
+    /* ── TABELA ──────────────────────────────────────────────────────── */
+    .table-wrapper {
+      background: #202824;
+      border: 1px solid #2e3d39;
+      border-radius: 9px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .table-header {
+      flex-shrink: 0;
+      padding: 9px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #c8ddd9;
+      border-bottom: 1px solid #2e3d39;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .table-header::before {
+      content: '';
+      display: inline-block;
+      width: 3px; height: 13px;
+      background: #008c6a;
+      border-radius: 2px;
+    }
+    .table-scroll { flex: 1; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: #192220;
+      font-size: 10px;
+      font-weight: 600;
+      color: #7a9e96;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      padding: 6px 14px;
+      text-align: left;
+    }
+    thead th:last-child { text-align: right; }
+    tbody tr { border-bottom: 1px solid #263330; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td { padding: 6px 14px; font-size: 12px; color: #c8ddd9; }
+    tbody td:last-child { text-align: right; color: #5bb98e; font-weight: 600; }
+    .rank-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      font-size: 9px; font-weight: 700;
+      margin-right: 6px;
+    }
+    .rank-1 { background: #008c6a33; color: #5bb98e; }
+    .rank-2 { background: #006d5833; color: #3da07a; }
+    .rank-3 { background: #4a4a4933; color: #a3a3a3; }
+    .rank-n { background: #202824;   color: #4a6b63; }
+
+    /* ── FOOTER (38px) ───────────────────────────────────────────────── */
+    .footer {
+      flex-shrink: 0;
+      height: 38px;
+      background: #151918;
+      border-top: 1px solid #2e3d39;
+      padding: 0 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: rgba(255,255,255,0.55);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <img class="header-logo" src="../../assets/logo redondo_verde_Prancheta 1.png" alt="Logo" />
+      <div>
+        <div class="header-title">Produção CELESC</div>
+        <div class="header-subtitle" id="dashSubtitle"></div>
+      </div>
+    </div>
+    <div class="header-date" id="dashDate"></div>
+  </div>
+
+  <!-- KPI CARDS (gerado pelo JS) -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- ÁREA PRINCIPAL -->
+  <div class="main-content">
+    <!-- Painel esquerdo: evolução (topo) + projeção (baixo) -->
+    <div class="left-panel">
+      <div class="left-top"    id="leftTop"></div>
+      <div class="left-bottom" id="leftBottom"></div>
+    </div>
+
+    <!-- Painel direito: barras por contrato + tabela -->
+    <div class="right-panel">
+      <div class="right-chart" id="rightChart"></div>
+      <div class="right-table" id="rightTable"></div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>Gerado automaticamente • Sistema de Monitoramento</span>
+    <span id="footerTs"></span>
+  </div>
+
+  <script>
+    const { config: CONFIG, resultado } = window.__PAYLOAD__;
+
+    const PALETTE = [
+      '#008c6a','#5bb98e','#006d58','#3da07a','#7dcfaa',
+      '#004d3f','#85d4b0','#2d8a6a','#a8e6cc','#1a6b52'
+    ];
+
+    function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+    function formatar(valor, formato) {
+      switch (formato) {
+        case 'moeda':      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(valor);
+        case 'percentual': return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(valor) + '%';
+        case 'inteiro':    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(valor);
+        case 'numero':     return new Intl.NumberFormat('pt-BR').format(valor);
+        default:           return String(valor ?? '—');
+      }
+    }
+
+    // ── Header ─────────────────────────────────────────────────────────
+    const now = new Date();
+    const fmt = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'America/Sao_Paulo' });
+    document.getElementById('dashSubtitle').textContent = CONFIG.subtitulo || '';
+    document.getElementById('dashDate').innerHTML       = `<strong>${fmt.format(now)}</strong>`;
+    document.getElementById('footerTs').textContent     = fmt.format(now);
+
+    // ── KPI Cards ──────────────────────────────────────────────────────
+    // Monta índice { id → valor } para resolver metaRef entre cards
+    const kpiPorId = {};
+    resultado.kpis.forEach(kpi => {
+      if (kpi.id) kpiPorId[kpi.id] = num(kpi.rows[0]?.valor);
+    });
+
+    // Maior dia com dados a partir do gráfico de evolução diária (graficos[0])
+    let maxDia = 0;
+    if (resultado.graficos[0]) {
+      resultado.graficos[0].rows.forEach(r => {
+        if (r.valor !== null && r.valor !== undefined && r.valor !== '') {
+          const match = String(r.label).match(/^(\d+)/);
+          if (match) maxDia = Math.max(maxDia, parseInt(match[1]));
+        }
+      });
+      // Fallback: conta linhas não-nulas
+      if (maxDia === 0)
+        maxDia = resultado.graficos[0].rows.filter(r => r.valor !== null && r.valor !== undefined).length;
+    }
+
+    const kpiGrid = document.getElementById('kpiGrid');
+    resultado.kpis.forEach(kpi => {
+      // KPIs ocultos alimentam kpiPorId mas não são renderizados no grid
+      if (kpi.oculto) return;
+
+      const valor = num(kpi.rows[0]?.valor);
+      const sub   = kpi.subDoCampo ? (kpi.rows[0]?.label || '—') : (kpi.sub || '');
+
+      // Badge de progresso vs meta mensal completa (card de projeção)
+      let metaBadge = '';
+      if (kpi.metaRef && kpi.metaRef in kpiPorId) {
+        const metaValor = kpiPorId[kpi.metaRef];
+        const pct = metaValor > 0 ? (valor / metaValor) * 100 : 0;
+        const pctStr = pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+        const cls = pct >= 100 ? 'up' : pct >= 70 ? 'flat' : 'down';
+        const clsMeta   = pct >= 100 ? 'up' : 'down';
+        const pctColor  = pct >= 100 ? '#5bb98e' : '#e74c3c';
+        metaBadge = `<div class="kpi-delta ${clsMeta}">▶ <span style="color:${pctColor};font-weight:800;font-size:13px">${pctStr}</span> da meta Mês</div>`;
+      }
+
+      // Meta proporcional: metaMes / 30 * maxDia
+      let valorExibido = valor;
+      let metaProporBadge = '';
+      if (kpi.metaProporRef && kpi.metaProporRef in kpiPorId && maxDia > 0) {
+        const metaValor = kpiPorId[kpi.metaProporRef];
+        const metaProporcional = (metaValor / 30) * maxDia;
+
+        if (kpi.totalRef && kpi.totalRef in kpiPorId) {
+          // Card com totalRef (ex: Total Produzido): mantém valor, mostra badge "X% da meta proporcional"
+          const total = kpiPorId[kpi.totalRef];
+          const pct = metaProporcional > 0 ? (total / metaProporcional) * 100 : 0;
+          const pctStr = pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+          const clsPropor      = pct >= 100 ? 'up' : 'down';
+          const pctProporColor = pct >= 100 ? '#5bb98e' : '#e74c3c';
+          metaProporBadge = `<div class="kpi-delta ${clsPropor}">▶ <span style="color:${pctProporColor};font-weight:800;font-size:13px">${pctStr}</span> da meta proporcional</div>`;
+        } else {
+          // Card sem totalRef (ex: Meta Proporcional): exibe o valor calculado, sem badge
+          valorExibido = metaProporcional;
+        }
+      }
+
+      const card = document.createElement('div');
+      card.className = 'kpi-card';
+      card.innerHTML = `
+        <div class="kpi-label">${kpi.label}</div>
+        <div class="kpi-value ${kpi.cor || 'primary'}">${formatar(valorExibido, kpi.formato)}</div>
+        <div class="kpi-sub">${sub}</div>
+        ${metaBadge}${metaProporBadge}
+      `;
+      kpiGrid.appendChild(card);
+    });
+
+
+    // Registra o plugin globalmente (necessário para Chart.js v4)
+    Chart.register(ChartDataLabels);
+
+    // Formato compacto para rótulos de dados (ex: R$ 50k, R$ 1,2M)
+    function formatarCompacto(valor, formato) {
+      if (formato !== 'moeda') return formatar(valor, formato);
+      const abs = Math.abs(valor);
+      if (abs >= 1_000_000) return 'R$ ' + (valor / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'M';
+      if (abs >= 1_000)     return 'R$ ' + (valor / 1_000).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + 'k';
+      return formatar(valor, formato);
+    }
+
+    // ── Função para criar um gráfico num container ─────────────────────
+    function criarGrafico(container, graf, idx, opcoes) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'chart-wrapper';
+      wrapper.innerHTML = `
+        <div class="chart-title">${graf.titulo}</div>
+        <div class="chart-canvas-wrap">
+          <canvas id="chart_${idx}"></canvas>
+        </div>
+      `;
+      container.appendChild(wrapper);
+
+      // Valor do delta (vem de outro KPI via deltaRef)
+      const delta      = (graf.deltaRef && graf.deltaRef in kpiPorId) ? kpiPorId[graf.deltaRef] : null;
+      const deltaColor = delta === null ? null : delta >= 0 ? '#5bb98e' : '#e74c3c';
+      const deltaArrow = delta === null ? '' : delta >= 0 ? '↑' : '↓';
+      const deltaTexto = delta === null ? ''
+        : delta === 0 ? '→'
+        : `${deltaArrow} ${formatarCompacto(Math.abs(delta), graf.formato)}`;
+
+      const labels     = graf.rows.map(r => r.label ?? '');
+      const isPie      = graf.tipo === 'pie' || graf.tipo === 'doughnut';
+      const isLine     = graf.tipo === 'line';
+      const isProjecao = isLine && !!graf.projecao;
+
+      // Valores reais: preserva null para dias futuros quando há projeção
+      const values = graf.rows.map(r =>
+        isProjecao && (r.valor === null || r.valor === undefined) ? null : num(r.valor)
+      );
+
+      // Índice do último ponto real (não-nulo) — ancoragem do delta e da projeção
+      const lastRealIdx = isProjecao
+        ? values.reduce((last, v, i) => v !== null ? i : last, -1)
+        : values.length - 1;
+
+      // ── Barras sobrepostas: meta (fundo) + produzido (frente) ───────────
+      let metaValuesRef = [];
+      const hasMetaRows = !isPie && !isLine && graf.metaRows && graf.metaRows.length > 0;
+
+      if (hasMetaRows) {
+        const metaMap = new Map(graf.metaRows.map(r => [String(r.label ?? ''), num(r.valor)]));
+        metaValuesRef = labels.map(l => metaMap.get(String(l)) ?? 0);
+
+        // Calcula % atingido e ordena tudo junto (desc por %)
+        const combined = labels.map((l, i) => ({
+          label: l, prod: values[i], meta: metaValuesRef[i],
+          pct: metaValuesRef[i] > 0 ? (values[i] / metaValuesRef[i]) * 100 : 0
+        }));
+        combined.sort((a, b) => b.meta - a.meta);
+
+        // Sobrescreve arrays ordenados
+        for (let i = 0; i < combined.length; i++) {
+          labels[i]        = combined[i].label;
+          values[i]        = combined[i].prod;
+          metaValuesRef[i] = combined[i].meta;
+        }
+      }
+
+      // Cor por faixa de atingimento: verde empresa >80%, amarelo empresa 50-80%, vermelho empresa <50%
+      function corPorPct(pct) {
+        return { bg: '#008c6a', border: '#5bb98e' };
+      }
+
+      // ── Dataset de projeção (linha tracejada a partir de hoje) ────────────
+      let projecaoDataset = null;
+      if (isProjecao) {
+        const projData = graf.rows.map((r, i) =>
+          (r.projetado !== null && r.projetado !== undefined) ? num(r.projetado) : null
+        );
+        const lastProjIdx = projData.reduce((last, v, i) => v !== null ? i : last, -1);
+
+        projecaoDataset = {
+          label: 'Projeção',
+          data:  projData,
+          borderColor: '#5bb98e88',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderDash: [6, 4],
+          tension: 0,
+          fill: false,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          spanGaps: false,
+          datalabels: {
+            labels: {
+              value: {
+                display: (ctx) => ctx.dataIndex === lastProjIdx && projData[ctx.dataIndex] !== null,
+                color: '#5bb98e',
+                font: { size: 12, weight: '700' },
+                formatter: (v) => formatarCompacto(v, graf.formato),
+                anchor: 'end', align: 'left', offset: 6, clamp: true,
+              },
+              delta: { display: false },
+            }
+          }
+        };
+      }
+
+      // ── Monta datasets ─────────────────────────────────────────────────
+      const mainDatasets = hasMetaRows
+        ? [
+            // PRODUÇÃO (FRENTE)
+            {
+              label: 'Produzido',
+              data:  values,
+              backgroundColor: labels.map((_, i) => {
+                const pct = metaValuesRef[i] > 0 ? (values[i] / metaValuesRef[i]) * 100 : 100;
+                return corPorPct(pct).bg;
+              }),
+              borderWidth: 0,
+              borderRadius: 4,
+              barPercentage: 0.75,
+              categoryPercentage: 0.85,
+              grouped: false,
+              order: 0,
+            },
+            // META (FUNDO)
+            {
+              label: 'Meta',
+              data:  metaValuesRef,
+              backgroundColor: '#2e3d3966', // Cinza-verde com ~40% opacidade
+              borderWidth: 0,
+              borderRadius: 4,
+              barPercentage: 0.75,
+              categoryPercentage: 0.85,
+              grouped: false,
+              order: 1,
+              datalabels: {
+                labels: {
+                  value: {
+                    display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0 || metaValuesRef[ctx.dataIndex] > 0,
+                    color: '#7a9e96',
+                    font: { size: 10, weight: '600' },
+                    formatter: (v, ctx) => formatarCompacto(metaValuesRef[ctx.dataIndex], graf.formato),
+                    anchor: 'end',
+                    align: 'top',
+                    offset: 4,
+                    clamp: true,
+                  },
+                  delta: { display: false },
+                }
+              }
+            },
+          ]
+        : [
+            {
+              label: graf.titulo,
+              data:  values,
+              backgroundColor: labels.map((_, i) => PALETTE[i % PALETTE.length] + (isPie ? 'dd' : '99')),
+              borderColor:     labels.map((_, i) => PALETTE[i % PALETTE.length]),
+              borderWidth: isLine ? 2 : 1.5,
+              borderRadius: isPie ? 0 : 4,
+              tension: 0.3,
+              fill: isLine ? { target: 'origin', above: '#008c6a18' } : false,
+              pointRadius:      isLine ? 4 : 0,
+              pointHoverRadius: isLine ? 6 : 0,
+              pointBackgroundColor: '#5bb98e',
+              spanGaps: false,
+            },
+          ];
+
+      new Chart(document.getElementById(`chart_${idx}`), {
+        type: graf.tipo,
+        data: {
+          labels,
+          datasets: [
+            ...mainDatasets,
+            ...(projecaoDataset ? [projecaoDataset] : [])
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {
+            padding: { top: 32, right: 16, bottom: 8, left: 8 }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: hasMetaRows ? {
+              enabled: true,
+              backgroundColor: '#1a2723ee',
+              titleColor: '#e2e8f0',
+              bodyColor: '#c8ddd9',
+              borderColor: '#2e3d39',
+              borderWidth: 1,
+              padding: 12,
+              cornerRadius: 8,
+              titleFont: { size: 14, weight: '700' },
+              bodyFont: { size: 13 },
+              displayColors: false,
+              filter: (item) => item.datasetIndex === 0,
+              callbacks: {
+                title: (items) => `Unidade: ${items[0]?.label || ''}`,
+                label: (item) => {
+                  const i    = item.dataIndex;
+                  const prod = values[i];
+                  const meta = metaValuesRef[i];
+                  const pct  = meta > 0 ? ((prod / meta) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—';
+                  return [
+                    `Produzido:   ${formatar(prod, graf.formato)}`,
+                    `Meta:        ${formatar(meta, graf.formato)}`,
+                    `Atingimento: ${pct}%`
+                  ];
+                }
+              }
+            } : { enabled: false },
+            datalabels: {
+              labels: {
+                // Label no TOPO da barra: valor produzido
+                value: {
+                  display: (ctx) => {
+                    if (hasMetaRows && ctx.datasetIndex !== 0) return false;
+                    if (ctx.datasetIndex !== 0 && !isPie) return false;
+                    const v = ctx.dataset.data[ctx.dataIndex];
+                    if (v === 0 || v === null) return false;
+                    // Projeção: mostra só primeiro e último ponto real
+                    if (opcoes && opcoes.apenasExtremosReais) {
+                      return ctx.dataIndex === 0 || ctx.dataIndex === lastRealIdx;
+                    }
+                    return true;
+                  },
+                  color:   '#e2e8f0',
+                  font:    { size: isPie ? 14 : 13, weight: '700' },
+                  formatter: (v, ctx) => formatarCompacto(v, graf.formato),
+                  anchor: isPie ? 'center' : 'end',
+                  align:  isPie ? 'center' : isLine
+                    ? (ctx) => ctx.dataIndex === lastRealIdx ? 'left' : 'top'
+                    : 'top',
+                  offset: isLine ? 6 : 4,
+                  clamp: true,
+                },
+                // Label DENTRO da barra: % atingido
+                pct: {
+                  display: (ctx) => {
+                    if (!hasMetaRows || ctx.datasetIndex !== 0) return false;
+                    return ctx.dataset.data[ctx.dataIndex] > 0;
+                  },
+                  color: '#ffffff',
+                  font: { size: 14, weight: '800' },
+                  formatter: (v, ctx) => {
+                    const meta = metaValuesRef[ctx.dataIndex];
+                    return meta > 0
+                      ? ((v / meta) * 100).toFixed(0) + '%'
+                      : '';
+                  },
+                  anchor: 'center',
+                  align:  'center',
+                  offset: 0,
+                  clamp:  true,
+                },
+                delta: {
+                  display: (ctx) => !opcoes?.ocultarDelta && ctx.datasetIndex === 0 && isLine && delta !== null
+                    && ctx.dataIndex === lastRealIdx,
+                  color:     deltaColor,
+                  font:      { size: 13, weight: '800' },
+                  formatter: () => deltaTexto,
+                  anchor: 'end',
+                  align:  'top',
+                  offset: 24,
+                  clamp:  true,
+                },
+              }
+            }
+          },
+          scales: isPie ? {} : {
+            x: {
+              stacked: false,
+              ticks: { color: '#7a9e96', font: { size: 10, weight: '600' }, maxRotation: 25 },
+              grid:  { display: false },
+            },
+            y: {
+              stacked: false,
+              ticks: hasMetaRows ? {
+                display: true,
+                color: '#4a6b63',
+                font: { size: 10 },
+                callback: (v) => formatarCompacto(v, graf.formato),
+                maxTicksLimit: 5,
+              } : { display: false },
+              grid: { color: hasMetaRows ? '#2e3d3944' : '#1e2d29', drawTicks: false },
+              grace: '12%',
+              beginAtZero: true,
+            }
+          }
+        }
+      });
+    }
+
+    // ── Esquerda topo: evolução diária real (índice 0) ────────────────
+    if (resultado.graficos[0]) {
+      criarGrafico(document.getElementById('leftTop'), resultado.graficos[0], 0, { ocultarDelta: true });
+    }
+
+    // ── Esquerda baixo: projeção mês completo (índice 2) ──────────────
+    if (resultado.graficos[2]) {
+      criarGrafico(document.getElementById('leftBottom'), resultado.graficos[2], 2, { apenasExtremosReais: true });
+    }
+
+    // ── Direita: Valor Produzido por contrato — barras (índice 1) ─────────────────
+    if (resultado.graficos[1]) {
+      criarGrafico(document.getElementById('rightChart'), resultado.graficos[1], 1);
+    }
+
+    // ── Tabela (painel direito inferior) ───────────────────────────────
+    if (resultado.tabela) {
+      const tab = resultado.tabela;
+
+      // Monta mapas: contrato → projeção, contrato → meta
+      const projMap = new Map((tab.projecaoRows || []).map(r => [String(r.label ?? ''), num(r.valor)]));
+      const metaMap = new Map((tab.metaRows || []).map(r => [String(r.label ?? ''), num(r.valor)]));
+
+      // Junta todos os contratos (da projeção como base)
+      const contratos = [...new Set([...projMap.keys(), ...metaMap.keys()])];
+      const ranking = contratos.map(label => {
+        const projecao = projMap.get(label) ?? 0;
+        const meta     = metaMap.get(label) ?? 0;
+        const pct      = meta > 0 ? (projecao / meta) * 100 : 0;
+        return { label, projecao, meta, pct };
+      })
+      .filter(r => r.meta > 0 || r.projecao > 0)
+      .sort((a, b) => b.pct - a.pct);
+
+      const tbodyRows = ranking.map((row, i) => {
+        const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-n';
+        const isAbove   = row.pct >= 100;
+        const rowColor  = isAbove ? '#5bb98e' : '#e74c3c';
+        const pctStr    = row.pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+        return `
+          <tr style="color:${rowColor}">
+            <td style="color:${rowColor}"><span class="rank-badge ${rankClass}">${i + 1}</span>${row.label ?? '—'}</td>
+            <td style="text-align:right;color:${rowColor};font-weight:700">${pctStr}</td>
+            <td style="text-align:right;color:${rowColor}">${formatar(row.projecao, 'moeda')}</td>
+            <td style="text-align:right;color:${rowColor}">${formatar(row.meta, 'moeda')}</td>
+          </tr>`;
+      }).join('');
+
+      document.getElementById('rightTable').innerHTML = `
+        <div class="table-wrapper">
+          <div class="table-header">${tab.titulo}</div>
+          <div class="table-scroll">
+            <table>
+              <thead><tr>
+                <th>Contrato</th>
+                <th style="text-align:right">Ating.</th>
+                <th style="text-align:right">Projeção</th>
+                <th style="text-align:right">Meta</th>
+              </tr></thead>
+              <tbody>${tbodyRows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
